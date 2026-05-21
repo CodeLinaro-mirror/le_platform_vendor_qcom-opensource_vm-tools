@@ -1,0 +1,139 @@
+#!/bin/sh
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
+# GvmInfo image header:
+# typedef struct {
+#   CHAR8 magic[GVMINFO_MAGIC_SIZE];
+#   UINT8 HeaderVersion;
+#   UINT8 HeaderSize;
+#   UINT8 AudioFrameworkSize;
+#   UINT8 UserCmdlineSize;
+# } GvmInfoHdr;
+
+usage() {
+    echo "usage: $(basename $0) -h: show help"
+    echo "usage: $(basename $0) <la or lv> [ cmdline e.g. initcall_debug ]"
+}
+
+# Argument la or lv is mandantory.
+if [ "$#" -lt "1" -o "$1" = "-h" ]; then
+    usage
+    exit
+fi
+
+# Runtime SOC detection
+MACHINE_FILE="/sys/devices/soc0/machine"
+if [ ! -f "${MACHINE_FILE}" ]; then
+    echo "Error: ${MACHINE_FILE} not exist!"
+    exit 1
+fi
+MACHINE=$(cat "${MACHINE_FILE}" | tr -d '\n ')
+echo "[INFO] Detected machine: ${MACHINE}"
+
+# Audio Framework Mapping
+case "${MACHINE}" in
+    SA8255P|SA8775P|SA8650P)
+        AWE_VARIANT="lemans.adsp.aweQ"
+        AR_VARIANT="lemans.adsp.prodQ"
+        ;;
+    QAM8797P|QAM8787P)
+        AWE_VARIANT="nord.adsp.audioQ"
+        AR_VARIANT="nord.adsp.audio_arQ"
+        ;;
+    *)
+        echo "Unsupported machine: ${MACHINE}"
+        exit 2
+        ;;
+esac
+
+echo "[INFO] AWE_VARIANT=${AWE_VARIANT}"
+echo "[INFO] AR_VARIANT=${AR_VARIANT}"
+
+# We support maximum 4 bytes for audio variant,
+# and maximum 255 bytes for user-defined cmdline.
+# Hence, we define MAX_AUDIO_FW = 4 and MAX_USER_CMD_LINE = 255 in ABL.
+AUDDIO_VARIANT_PATH="/sys/kernel/debug/qcom_socinfo/adsp/variant"
+GVMINFO_MAGIC="GVMINFO!"
+GVMINFO_HDR_VERSION=1
+GVMINFO_HDR_SIZE=12
+MAX_USER_CMD_LINE=255
+MAX_GVMINFO_SIZE=512
+
+gvm_variant=$(basename "$1")
+# Create output in /data directory for safety
+OUTPUT_DIR="/data/vendor/gvminfo"
+OUTPUT_FILE="${OUTPUT_DIR}/${gvm_variant}_gvminfo.img"
+rm -rf ${OUTPUT_FILE}
+echo "$0: Setup ${OUTPUT_FILE}"
+
+write_hex() {
+  if [ "$1" -lt 0 ] || [ "$1" -gt 255 ]; then
+    echo "Error: Value $1 out of range for hex conversion (0-255)" >&2
+    exit 1
+  fi
+  hex_num=$(printf "%x" $1)
+  printf "\x${hex_num}" >> "${OUTPUT_FILE}"
+}
+
+if [ -f "${AUDDIO_VARIANT_PATH}" ]; then
+  audio_variant=$(cat ${AUDDIO_VARIANT_PATH})
+  if [ -n "${audio_variant}" ]; then
+    echo "$0: Audio variant=${audio_variant}"
+  fi
+else
+  echo "Warning: Audio variant file not found at ${AUDDIO_VARIANT_PATH}"
+  audio_variant=""
+fi
+
+if [ "${audio_variant}" = "${AWE_VARIANT}" ]; then
+  audio_framework="awe"
+elif [ "${audio_variant}" = "${AR_VARIANT}" ]; then
+  case "${MACHINE}" in
+    SA8255P|SA8775P|SA8650P)
+      audio_framework="ar"
+      ;;
+    QAM8797P|QAM8787P)
+      audio_framework="audioreach_gen5"
+      ;;
+  esac
+else
+  audio_framework=""
+fi
+audio_framework_size=$(($(echo "${audio_framework}" | wc -c) - 1))
+
+user_cmdline="$2";
+# Validate user_cmdline length (max 255 bytes as per comment)
+if [ -n "${user_cmdline}" ]; then
+  user_cmdline_len=${#user_cmdline}
+  if [ ${user_cmdline_len} -gt ${MAX_USER_CMD_LINE} ]; then
+    echo "Error: Command line too long (${user_cmdline_len} bytes). Maximum allowed is 255 bytes."
+    exit 1
+  fi
+  echo "$0: User cmdline=${user_cmdline}"
+fi
+user_cmdline_size=$(($(echo "${user_cmdline}" | wc -c) - 1))
+gvminfo_pad_size=$((${MAX_GVMINFO_SIZE} - ${GVMINFO_HDR_SIZE}))
+gvminfo_pad_size=$((gvminfo_pad_size - audio_framework_size))
+gvminfo_pad_size=$((gvminfo_pad_size - user_cmdline_size))
+
+printf "${GVMINFO_MAGIC}" > "${OUTPUT_FILE}"
+write_hex "${GVMINFO_HDR_VERSION}"
+write_hex "${GVMINFO_HDR_SIZE}"
+# Always write these fields to maintain fixed header size
+write_hex "${audio_framework_size}"
+write_hex "${user_cmdline_size}"
+
+if [ "${audio_framework_size}" -gt 0 ]; then
+  echo "$0: write audio framework"
+  printf "${audio_framework}" >> "${OUTPUT_FILE}"
+fi
+if [ "${user_cmdline_size}" -gt 0 ]; then
+  echo "$0: write user cmdline"
+  printf "${user_cmdline}" >> "${OUTPUT_FILE}"
+fi
+
+for i in $(seq 1 ${gvminfo_pad_size});
+do
+  printf "\x0" >> "${OUTPUT_FILE}"
+done
