@@ -1,0 +1,24 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: BSD-3-Clause-Clear
+
+[Unit]
+Description=Generate GvmInfo image for LA GVM
+DefaultDependencies=no
+Before=qcrosvm.service
+After=local-fs.target
+ConditionPathExists=!/data/vendor/gvminfo/.gvminfo_img_generated
+
+[Service]
+Environment=VMNAME="la"
+# Extra customized kernel cmdline parameters
+# Keep empty "" without custom args; add self-defined items inside quotes if needed
+# Sample: Environment=CMDLINE="initcall_debug"
+Environment=CMDLINE=""
+Type=oneshot
+ExecStartPre=/bin/mkdir -p /data/vendor/gvminfo
+ExecStart=/usr/bin/mkgvminfo ${VMNAME} ${CMDLINE}
+ExecStartPost=/bin/sh -c 'if [ $? -eq 0 ]; then touch /data/vendor/gvminfo/.gvminfo_img_generated; fi'
+TimeoutSec=90
+
+[Install]
+WantedBy=multi-user.target
