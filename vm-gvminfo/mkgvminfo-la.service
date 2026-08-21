@@ -4,9 +4,9 @@
 [Unit]
 Description=Generate GvmInfo image for LA GVM
 DefaultDependencies=no
-After=local-fs.target data.mount sys-kernel-debug.mount
-Requires=data.mount
-ConditionPathExists=!/data/vendor/gvminfo/.gvminfo_img_generated
+Before=qcrosvm.service
+After=sys-kernel-debug.mount
+Requires=sys-kernel-debug.mount
 
 [Service]
 Environment=VMNAME="la"
@@ -15,9 +15,7 @@ Environment=VMNAME="la"
 # Sample: Environment=CMDLINE="initcall_debug"
 Environment=CMDLINE=""
 Type=oneshot
-ExecStartPre=/bin/mkdir -p /data/vendor/gvminfo
 ExecStart=/usr/bin/mkgvminfo ${VMNAME} ${CMDLINE}
-ExecStartPost=/bin/sh -c 'if [ $? -eq 0 ]; then touch /data/vendor/gvminfo/.gvminfo_img_generated; fi'
 TimeoutSec=90
 
 [Install]

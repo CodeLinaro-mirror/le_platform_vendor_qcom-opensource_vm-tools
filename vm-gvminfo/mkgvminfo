@@ -36,6 +36,7 @@ case "${MACHINE}" in
     SA8255P|SA8775P|SA8650P)
         AWE_VARIANT="lemans.adsp.aweQ"
         AR_VARIANT="lemans.adsp.prodQ"
+        AUDIOLITE_VARIANT="lemans.adsp.audioli"
         ;;
     QAM8797P|QAM8787P)
         AWE_VARIANT="nord.adsp.audioQ"
@@ -49,6 +50,9 @@ esac
 
 echo "[INFO] AWE_VARIANT=${AWE_VARIANT}"
 echo "[INFO] AR_VARIANT=${AR_VARIANT}"
+if [ -n "${AUDIOLITE_VARIANT}" ]; then
+  echo "[INFO] AUDIOLITE_VARIANT=${AUDIOLITE_VARIANT}"
+fi
 
 # We support maximum 4 bytes for audio variant,
 # and maximum 255 bytes for user-defined cmdline.
@@ -61,8 +65,8 @@ MAX_USER_CMD_LINE=255
 MAX_GVMINFO_SIZE=512
 
 gvm_variant=$(basename "$1")
-# Create output in /data directory for safety
-OUTPUT_DIR="/data/vendor/gvminfo"
+# Create output in /tmp, regenerated on every boot
+OUTPUT_DIR="/tmp"
 OUTPUT_FILE="${OUTPUT_DIR}/${gvm_variant}_gvminfo.img"
 rm -rf ${OUTPUT_FILE}
 echo "$0: Setup ${OUTPUT_FILE}"
@@ -97,6 +101,8 @@ elif [ "${audio_variant}" = "${AR_VARIANT}" ]; then
       audio_framework="audioreach_gen5"
       ;;
   esac
+elif [ -n "${AUDIOLITE_VARIANT}" ] && [ "${audio_variant}" = "${AUDIOLITE_VARIANT}" ]; then
+  audio_framework="audiolite"
 else
   audio_framework=""
 fi
