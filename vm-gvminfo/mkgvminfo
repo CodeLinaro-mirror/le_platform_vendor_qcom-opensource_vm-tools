@@ -54,9 +54,9 @@ if [ -n "${AUDIOLITE_VARIANT}" ]; then
   echo "[INFO] AUDIOLITE_VARIANT=${AUDIOLITE_VARIANT}"
 fi
 
-# We support maximum 4 bytes for audio variant,
+# We support maximum MAX_AUDIO_FW_LENGTH (16) bytes for audio variant,
 # and maximum 255 bytes for user-defined cmdline.
-# Hence, we define MAX_AUDIO_FW = 4 and MAX_USER_CMD_LINE = 255 in ABL.
+# MAX_AUDIO_FW_LENGTH and MAX_USER_CMD_LINE = 255 are defined in ABL's DeviceInfo.h.
 AUDDIO_VARIANT_PATH="/sys/kernel/debug/qcom_socinfo/adsp/variant"
 GVMINFO_MAGIC="GVMINFO!"
 GVMINFO_HDR_VERSION=1
