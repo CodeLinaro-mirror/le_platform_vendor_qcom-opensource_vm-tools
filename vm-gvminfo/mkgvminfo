@@ -38,7 +38,7 @@ case "${MACHINE}" in
         AR_VARIANT="lemans.adsp.prodQ"
         AUDIOLITE_VARIANT="lemans.adsp.audioli"
         ;;
-    QAM8797P|QAM8787P)
+    QAM8797P|QAM8787P|IQ10800MD)
         AWE_VARIANT="nord.adsp.audioQ"
         AR_VARIANT="nord.adsp.audio_arQ"
         ;;
@@ -97,7 +97,7 @@ elif [ "${audio_variant}" = "${AR_VARIANT}" ]; then
     SA8255P|SA8775P|SA8650P)
       audio_framework="ar"
       ;;
-    QAM8797P|QAM8787P)
+    QAM8797P|QAM8787P|IQ10800MD)
       audio_framework="audioreach_gen5"
       ;;
   esac
